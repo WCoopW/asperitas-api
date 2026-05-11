@@ -1,0 +1,40 @@
+package middleware
+
+import (
+	"context"
+	"net/http"
+	"strings"
+
+	"reddit/internal/domain/auth"
+)
+
+const ctxUserID = "user_id"
+
+type AuthMiddleware struct {
+	validator auth.TokenValidator
+}
+
+func NewAuthMiddleware(validator auth.TokenValidator) *AuthMiddleware {
+	return &AuthMiddleware{validator: validator}
+}
+
+func (m *AuthMiddleware) WithAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw := strings.TrimSpace(r.Header.Get("Authorization"))
+		if raw == "" {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		token := raw
+		if len(raw) > 7 && strings.EqualFold(raw[:7], "Bearer ") {
+			token = strings.TrimSpace(raw[7:])
+		}
+		userID, err := m.validator.ValidateToken(token)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		ctx := context.WithValue(r.Context(), ctxUserID, userID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
