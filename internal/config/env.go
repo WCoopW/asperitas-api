@@ -12,12 +12,27 @@ import (
 type Config struct {
 	Port       int    `env:"PORT"`
 	DBHost     string `env:"DB_HOST"`
+	DBName     string `env:"DB_HOST"`
 	DBPort     int    `env:"DB_PORT"`
 	DBUser     string `env:"DB_USER"`
 	DBPassword string `env:"DB_PASSWORD"`
 	AppEnv     string `env:"APP_ENV"`
 	JWT        JWT    `env:"JWT"`
+	DB         DB     `env:"DB"`
 }
+
+type DB struct {
+	Host         string        `env:"DB_HOST"`
+	Port         int           `env:"DB_PORT"`
+	User         string        `env:"DB_USER"`
+	Password     string        `env:"DB_PASSWORD"`
+	DBName       string        `env:"DB_NAME"`
+	MaxOpenConns int           `env:"DB_MAX_OPEN_CONNS"`
+	MaxIdleConns int           `env:"DB_MAX_IDLE_CONNS"`
+	MaxLifetime  time.Duration `env:"DB_MAX_LIFETIME"`
+	MaxIdleTime  time.Duration `env:"DB_MAX_IDLE_TIME"`
+}
+
 type JWT struct {
 	Secret string        `env:"JWT_SECRET"`
 	Expire time.Duration `env:"JWT_EXPIRE"`
