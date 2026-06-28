@@ -76,8 +76,8 @@ func (app *App) setuphandlers() {
 
 	publicMux := app.mux.PathPrefix("/api").Subrouter()
 	publicMux.HandleFunc("/register", app.di.AuthController.Register).Methods("POST")
-	publicMux.HandleFunc("/login/", app.di.AuthController.Login).Methods("POST")
-	publicMux.HandleFunc("/logout/", app.di.AuthController.Logout).Methods("POST")
+	publicMux.HandleFunc("/login", app.di.AuthController.Login).Methods("POST")
+	publicMux.HandleFunc("/logout", app.di.AuthController.Logout).Methods("POST")
 	publicMux.HandleFunc("/posts/", app.di.PostController.GetPosts).Methods("GET")
 	publicMux.HandleFunc("/posts/{CATEGORY_NAME}", app.di.PostController.GetPostsByCategory).Methods("GET")
 	publicMux.HandleFunc("/post/{POST_ID}", app.di.PostController.GetPostByID).Methods("GET")

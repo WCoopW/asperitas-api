@@ -10,15 +10,10 @@ import (
 )
 
 type Config struct {
-	Port       int    `env:"PORT"`
-	DBHost     string `env:"DB_HOST"`
-	DBName     string `env:"DB_HOST"`
-	DBPort     int    `env:"DB_PORT"`
-	DBUser     string `env:"DB_USER"`
-	DBPassword string `env:"DB_PASSWORD"`
-	AppEnv     string `env:"APP_ENV"`
-	JWT        JWT    `env:"JWT"`
-	DB         DB     `env:"DB"`
+	Port   int    `env:"PORT"`
+	AppEnv string `env:"APP_ENV"`
+	JWT    JWT    `env:"JWT"`
+	DB     DB     `env:"DB"`
 }
 
 type DB struct {
