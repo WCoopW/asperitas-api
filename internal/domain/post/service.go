@@ -1,33 +1,23 @@
 package post
 
 import (
+	"context"
+
 	"reddit/internal/domain/user"
 
 	"go.uber.org/zap"
 )
 
 type PostService interface {
-	GetPostByID(id string) (Post, error)
-	GetPosts() ([]Post, error)
-	GetPostsByCategory(category string) ([]Post, error)
-	GetPostsByUser(userLogin string) ([]Post, error)
-	AddComment(postID string, userID string, comment Comment) (Comment, error)
-	CreatePost(post Post, userID string) (Post, error)
-	DeletePost(id string, userID string) error
-	DeleteComment(postID string, commentID string, userID string) error
-	UpdateVote(id string, userID string, value int) (Post, error)
-}
-
-type PostRepository interface {
-	GetPostByID(id string) (Post, error)
-	GetPosts() ([]Post, error)
-	GetPostsByCategory(category string) ([]Post, error)
-	GetPostsByUser(userLogin string) ([]Post, error)
-	AddComment(postID string, comment Comment) (Comment, error)
-	CreatePost(post Post) (Post, error)
-	DeletePost(id string) error
-	DeleteComment(postID string, commentID string) error
-	UpdateVote(id string, userID string, value int) (Post, error)
+	GetPostByID(ctx context.Context, id string) (Post, error)
+	GetPosts(ctx context.Context, filter PostFilter, limit int, offset int) ([]Post, error)
+	GetPostsByCategory(ctx context.Context, category string) ([]Post, error)
+	GetPostsByUser(ctx context.Context, userLogin string) ([]Post, error)
+	AddComment(ctx context.Context, postID string, userID string, comment Comment) (Comment, error)
+	CreatePost(ctx context.Context, post Post, userID string) (Post, error)
+	DeletePost(ctx context.Context, id string, userID string) error
+	DeleteComment(ctx context.Context, postID string, commentID string, userID string) error
+	UpdateVote(ctx context.Context, id string, userID string, value int) (Post, error)
 }
 
 type service struct {
@@ -37,45 +27,54 @@ type service struct {
 }
 
 func New(repo PostRepository, userService user.UserService, logger *zap.SugaredLogger) PostService {
-	return &service{repo: repo, userService: userService, logger: logger}
-}
-
-func (s *service) GetPostByID(id string) (Post, error) {
-	return s.repo.GetPostByID(id)
-}
-
-func (s *service) GetPosts() ([]Post, error) {
-	return s.repo.GetPosts()
-}
-
-func (s *service) GetPostsByCategory(category string) ([]Post, error) {
-	return s.repo.GetPostsByCategory(category)
-}
-
-func (s *service) GetPostsByUser(userLogin string) ([]Post, error) {
-	return s.repo.GetPostsByUser(userLogin)
-}
-
-func (s *service) AddComment(postID string, userID string, comment Comment) (Comment, error) {
-	author, err := s.userService.GetUserByID(userID)
-	if err != nil {
-		return Comment{}, err
+	return &service{
+		repo:        repo,
+		userService: userService,
+		logger:      logger,
 	}
-	comment.Author = author
-	return s.repo.AddComment(postID, comment)
 }
 
-func (s *service) CreatePost(post Post, userID string) (Post, error) {
+func (s *service) GetPostByID(ctx context.Context, id string) (Post, error) {
+	return s.repo.GetByID(ctx, id)
+}
+
+func (s *service) GetPosts(ctx context.Context, filter PostFilter, limit int, offset int) ([]Post, error) {
+	return s.repo.List(ctx, filter, limit, offset)
+}
+
+func (s *service) GetPostsByCategory(ctx context.Context, category string) ([]Post, error) {
+	return s.repo.List(ctx, PostFilter{Category: category}, 0, 0)
+}
+
+func (s *service) GetPostsByUser(ctx context.Context, userLogin string) ([]Post, error) {
+	author, err := s.userService.GetUserByUsername(userLogin)
+	if err != nil {
+		return []Post{}, err
+	}
+	return s.repo.List(ctx, PostFilter{AuthorID: author.ID}, 0, 0)
+}
+
+func (s *service) CreatePost(ctx context.Context, post Post, userID string) (Post, error) {
 	author, err := s.userService.GetUserByID(userID)
 	if err != nil {
 		return Post{}, err
 	}
 	post.Author = author
-	return s.repo.CreatePost(post)
+
+	return s.repo.Create(ctx, &post)
 }
 
-func (s *service) DeletePost(id string, userID string) error {
-	p, err := s.repo.GetPostByID(id)
+func (s *service) AddComment(ctx context.Context, postID string, userID string, comment Comment) (Comment, error) {
+	author, err := s.userService.GetUserByID(userID)
+	if err != nil {
+		return Comment{}, err
+	}
+	comment.Author = author
+	return s.repo.AddComment(ctx, postID, comment)
+}
+
+func (s *service) DeletePost(ctx context.Context, id string, userID string) error {
+	p, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -83,11 +82,11 @@ func (s *service) DeletePost(id string, userID string) error {
 	if p.Author.ID != userID {
 		return ErrForbidden
 	}
-	return s.repo.DeletePost(id)
+	return s.repo.Delete(ctx, id)
 }
 
-func (s *service) DeleteComment(id, commentID, userID string) error {
-	p, err := s.repo.GetPostByID(id)
+func (s *service) DeleteComment(ctx context.Context, id, commentID, userID string) error {
+	p, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -105,9 +104,9 @@ func (s *service) DeleteComment(id, commentID, userID string) error {
 		return ErrNotFound
 	}
 
-	return s.repo.DeleteComment(id, commentID)
+	return s.repo.DeleteComment(ctx, id, commentID)
 }
 
-func (s *service) UpdateVote(id string, userID string, value int) (Post, error) {
-	return s.repo.UpdateVote(id, userID, value)
+func (s *service) UpdateVote(ctx context.Context, id string, userID string, value int) (Post, error) {
+	return s.repo.UpdateVote(ctx, id, userID, value)
 }
