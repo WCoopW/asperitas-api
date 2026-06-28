@@ -22,7 +22,9 @@ func New(postService domain.PostService, logger *zap.SugaredLogger) *PostControl
 }
 
 func (c *PostController) GetPosts(w http.ResponseWriter, r *http.Request) {
-	posts, err := c.postService.GetPosts()
+	ctx, cancel := helpers.CtxDefaultTimeout(r.Context(), nil)
+	defer cancel()
+	posts, err := c.postService.GetPosts(ctx, domain.PostFilter{}, 0, 0)
 	if err != nil {
 		writeAppError(w, err)
 		return
@@ -38,7 +40,9 @@ func (c *PostController) GetPosts(w http.ResponseWriter, r *http.Request) {
 
 func (c *PostController) GetPostsByCategory(w http.ResponseWriter, r *http.Request) {
 	category := mux.Vars(r)["CATEGORY_NAME"]
-	posts, err := c.postService.GetPostsByCategory(category)
+	ctx, cancel := helpers.CtxDefaultTimeout(r.Context(), nil)
+	defer cancel()
+	posts, err := c.postService.GetPostsByCategory(ctx, category)
 	if err != nil {
 		writeAppError(w, err)
 		return
@@ -52,7 +56,9 @@ func (c *PostController) GetPostsByCategory(w http.ResponseWriter, r *http.Reque
 
 func (c *PostController) GetPostByID(w http.ResponseWriter, r *http.Request) {
 	postID := mux.Vars(r)["POST_ID"]
-	post, err := c.postService.GetPostByID(postID)
+	ctx, cancel := helpers.CtxDefaultTimeout(r.Context(), nil)
+	defer cancel()
+	post, err := c.postService.GetPostByID(ctx, postID)
 	if err != nil {
 		writeAppError(w, err)
 		return
@@ -62,7 +68,9 @@ func (c *PostController) GetPostByID(w http.ResponseWriter, r *http.Request) {
 
 func (c *PostController) GetPostByUser(w http.ResponseWriter, r *http.Request) {
 	userLogin := mux.Vars(r)["USER_LOGIN"]
-	posts, err := c.postService.GetPostsByUser(userLogin)
+	ctx, cancel := helpers.CtxDefaultTimeout(r.Context(), nil)
+	defer cancel()
+	posts, err := c.postService.GetPostsByUser(ctx, userLogin)
 	if err != nil {
 		writeAppError(w, err)
 		return
@@ -76,6 +84,8 @@ func (c *PostController) GetPostByUser(w http.ResponseWriter, r *http.Request) {
 
 func (c *PostController) CreatePost(w http.ResponseWriter, r *http.Request) {
 	var dto CreatePostDTO
+	ctx, cancel := helpers.CtxDefaultTimeout(r.Context(), nil)
+	defer cancel()
 	err := json.NewDecoder(r.Body).Decode(&dto)
 	if err != nil {
 		writeAppError(w, err)
@@ -94,7 +104,7 @@ func (c *PostController) CreatePost(w http.ResponseWriter, r *http.Request) {
 		URL:      dto.URL,
 		Category: dto.Category,
 	}
-	result, err := c.postService.CreatePost(p, userID)
+	result, err := c.postService.CreatePost(ctx, p, userID)
 	if err != nil {
 		writeAppError(w, err)
 		return
@@ -104,21 +114,25 @@ func (c *PostController) CreatePost(w http.ResponseWriter, r *http.Request) {
 
 func (c *PostController) DeletePost(w http.ResponseWriter, r *http.Request) {
 	postID := mux.Vars(r)["POST_ID"]
+	ctx, cancel := helpers.CtxDefaultTimeout(r.Context(), nil)
+	defer cancel()
 	if postID == "" {
 		writeAppError(w, domain.ErrInvalidData)
 		return
 	}
 	userID := r.Context().Value("user_id").(string)
-	err := c.postService.DeletePost(postID, userID)
+	err := c.postService.DeletePost(ctx, postID, userID)
 	if err != nil {
 		writeAppError(w, err)
 		return
 	}
-	helpers.WriteJSON(w, http.StatusNoContent, nil)
+	helpers.WriteNoContent(w)
 }
 
 func (c *PostController) AddComment(w http.ResponseWriter, r *http.Request) {
 	postID := mux.Vars(r)["POST_ID"]
+	ctx, cancel := helpers.CtxDefaultTimeout(r.Context(), nil)
+	defer cancel()
 	if postID == "" {
 		writeAppError(w, domain.ErrInvalidData)
 		return
@@ -137,7 +151,7 @@ func (c *PostController) AddComment(w http.ResponseWriter, r *http.Request) {
 	comment := domain.Comment{
 		Body: dto.Body,
 	}
-	result, err := c.postService.AddComment(postID, userID, comment)
+	result, err := c.postService.AddComment(ctx, postID, userID, comment)
 	if err != nil {
 		writeAppError(w, err)
 		return
@@ -148,6 +162,8 @@ func (c *PostController) AddComment(w http.ResponseWriter, r *http.Request) {
 func (c *PostController) DeleteComment(w http.ResponseWriter, r *http.Request) {
 	commentID := mux.Vars(r)["COMMENT_ID"]
 	postID := mux.Vars(r)["POST_ID"]
+	ctx, cancel := helpers.CtxDefaultTimeout(r.Context(), nil)
+	defer cancel()
 	userID := r.Context().Value("user_id").(string)
 
 	if postID == "" || userID == "" || commentID == "" {
@@ -155,22 +171,24 @@ func (c *PostController) DeleteComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := c.postService.DeleteComment(postID, commentID, userID)
+	err := c.postService.DeleteComment(ctx, postID, commentID, userID)
 	if err != nil {
 		writeAppError(w, err)
 		return
 	}
-	helpers.WriteJSON(w, http.StatusNoContent, nil)
+	helpers.WriteNoContent(w)
 }
 
 func (c *PostController) UpvotePost(w http.ResponseWriter, r *http.Request) {
 	postID := mux.Vars(r)["POST_ID"]
+	ctx, cancel := helpers.CtxDefaultTimeout(r.Context(), nil)
+	defer cancel()
 	if postID == "" {
 		writeAppError(w, domain.ErrInvalidData)
 		return
 	}
 	userID := r.Context().Value("user_id").(string)
-	result, err := c.postService.UpdateVote(postID, userID, 1)
+	result, err := c.postService.UpdateVote(ctx, postID, userID, 1)
 	if err != nil {
 		writeAppError(w, err)
 		return
@@ -180,12 +198,14 @@ func (c *PostController) UpvotePost(w http.ResponseWriter, r *http.Request) {
 
 func (c *PostController) DownvotePost(w http.ResponseWriter, r *http.Request) {
 	postID := mux.Vars(r)["POST_ID"]
+	ctx, cancel := helpers.CtxDefaultTimeout(r.Context(), nil)
+	defer cancel()
 	if postID == "" {
 		writeAppError(w, domain.ErrInvalidData)
 		return
 	}
 	userID := r.Context().Value("user_id").(string)
-	result, err := c.postService.UpdateVote(postID, userID, -1)
+	result, err := c.postService.UpdateVote(ctx, postID, userID, -1)
 	if err != nil {
 		writeAppError(w, err)
 		return
@@ -195,12 +215,14 @@ func (c *PostController) DownvotePost(w http.ResponseWriter, r *http.Request) {
 
 func (c *PostController) UnvotePost(w http.ResponseWriter, r *http.Request) {
 	postID := mux.Vars(r)["POST_ID"]
+	ctx, cancel := helpers.CtxDefaultTimeout(r.Context(), nil)
+	defer cancel()
 	if postID == "" {
 		writeAppError(w, domain.ErrInvalidData)
 		return
 	}
 	userID := r.Context().Value("user_id").(string)
-	result, err := c.postService.UpdateVote(postID, userID, 0)
+	result, err := c.postService.UpdateVote(ctx, postID, userID, 0)
 	if err != nil {
 		writeAppError(w, err)
 		return
@@ -212,18 +234,17 @@ func writeAppError(w http.ResponseWriter, err error) {
 	var vErr *domain.ValidationError
 	switch {
 	case errors.Is(err, domain.ErrNotFound):
-		helpers.WriteJSON(w, http.StatusNotFound, map[string]string{"error": "post not found"})
+		helpers.WriteError(w, http.StatusNotFound, "post not found")
 	case errors.Is(err, domain.ErrForbidden):
-		helpers.WriteJSON(w, http.StatusForbidden, map[string]string{"error": "forbidden"})
+		helpers.WriteError(w, http.StatusForbidden, "forbidden")
 	case errors.Is(err, domain.ErrInvalidData):
-		helpers.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid data"})
+		helpers.WriteError(w, http.StatusBadRequest, "invalid data")
 	case errors.As(err, &vErr):
 		helpers.WriteJSON(w, http.StatusUnprocessableEntity, map[string]string{
-			"error":   "validation failed",
-			"field":   vErr.Field,
 			"message": vErr.Message,
+			"field":   vErr.Field,
 		})
 	default:
-		helpers.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
+		helpers.WriteError(w, http.StatusInternalServerError, "internal error")
 	}
 }

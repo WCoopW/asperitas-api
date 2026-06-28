@@ -1,6 +1,8 @@
 package post
 
-import "errors"
+import (
+	domain "reddit/internal/domain/post"
+)
 
 type CreatePostDTO struct {
 	Type     string `json:"type"`
@@ -12,22 +14,37 @@ type CreatePostDTO struct {
 
 func (dto *CreatePostDTO) Validate() error {
 	if dto.Type != "link" && dto.Type != "text" {
-		return errors.New("invalid post type")
+		return &domain.ValidationError{
+			Field:   "type",
+			Message: "invalid post type",
+		}
 	}
 
 	if dto.Type == "link" && dto.URL == "" {
-		return errors.New("url is required for link posts")
+		return &domain.ValidationError{
+			Field:   "url",
+			Message: "url is required for link posts",
+		}
 	}
 
 	if dto.Type == "text" && dto.Text == "" {
-		return errors.New("text is required for text posts")
+		return &domain.ValidationError{
+			Field:   "text",
+			Message: "text is required for text posts",
+		}
 	}
 
 	if dto.Title == "" {
-		return errors.New("title is required")
+		return &domain.ValidationError{
+			Field:   "title",
+			Message: "title is required",
+		}
 	}
 	if dto.Category == "" {
-		return errors.New("category is required")
+		return &domain.ValidationError{
+			Field:   "category",
+			Message: "category is required",
+		}
 	}
 	return nil
 }

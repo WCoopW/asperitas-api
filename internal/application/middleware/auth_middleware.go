@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"reddit/internal/domain/auth"
+	"reddit/pkg/helpers"
 )
 
 const ctxUserID = "user_id"
@@ -22,7 +23,7 @@ func (m *AuthMiddleware) WithAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		raw := strings.TrimSpace(r.Header.Get("Authorization"))
 		if raw == "" {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			helpers.WriteError(w, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 		token := raw
@@ -31,7 +32,7 @@ func (m *AuthMiddleware) WithAuth(next http.Handler) http.Handler {
 		}
 		userID, err := m.validator.ValidateToken(token)
 		if err != nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			helpers.WriteError(w, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 		ctx := context.WithValue(r.Context(), ctxUserID, userID)
