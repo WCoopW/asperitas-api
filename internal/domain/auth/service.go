@@ -26,9 +26,6 @@ func New(users user.UserService, tokens TokenIssuer, logger *zap.SugaredLogger) 
 func (s *service) Login(username, password string) (string, error) {
 	u, err := s.users.GetUserByUsername(username)
 	if err != nil {
-		if err == user.ErrNotFound {
-			return "", user.ErrWrongCredentials
-		}
 		return "", err
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)); err != nil {
