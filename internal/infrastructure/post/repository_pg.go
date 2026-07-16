@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"reddit/internal/apperrors"
 	domain "reddit/internal/domain/post"
-	"reddit/internal/infrastructure"
 
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
@@ -31,7 +31,7 @@ func (r *PGRepository) GetByID(ctx context.Context, id string) (domain.Post, err
 	var post domain.Post
 	err := r.db.Select(&post, query, id)
 	if err != nil {
-		return domain.Post{}, infrastructure.ErrNotFound
+		return domain.Post{}, apperrors.ErrNotFound
 	}
 	return post, nil
 }

@@ -3,8 +3,8 @@ package comments
 import (
 	"context"
 
+	"reddit/internal/apperrors"
 	domain "reddit/internal/domain/comments"
-	"reddit/internal/infrastructure"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -51,7 +51,7 @@ func (r *PGRepository) GetByID(ctx context.Context, id string) (domain.Comment, 
 	var comment domain.Comment
 	err := r.db.Select(&comment, query, id)
 	if err != nil {
-		return domain.Comment{}, infrastructure.ErrNotFound
+		return domain.Comment{}, apperrors.ErrNotFound
 	}
 	return comment, nil
 }
