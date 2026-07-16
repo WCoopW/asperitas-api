@@ -23,8 +23,8 @@ func NewUserPGRepository(db *sqlx.DB) domain.UserRepository {
 
 func (r *UserPGRepository) GetUserByUsername(username string) (domain.User, error) {
 	return r.getUser(
-		`SELECT id, username, password_hash FROM users WHERE username = $1`,
-		username,
+		`SELECT id, username, password_hash FROM users WHERE username ILIKE $1`,
+		"%"+username+"%",
 	)
 }
 
