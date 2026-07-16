@@ -12,8 +12,10 @@ import (
 	"reddit/internal/config"
 	"reddit/internal/db"
 	authdomain "reddit/internal/domain/auth"
+	"reddit/internal/domain/comments"
 	post "reddit/internal/domain/post"
 	user "reddit/internal/domain/user"
+	comment_repo "reddit/internal/infrastructure/comments"
 	post_repo "reddit/internal/infrastructure/post"
 	user_repo "reddit/internal/infrastructure/user"
 	"reddit/pkg/jwtutil"
@@ -68,9 +70,12 @@ func initDependencies(cfg config.Config, db *sqlx.DB, logger *zap.SugaredLogger)
 	authService := authdomain.New(userService, jwtTokens, logger.Named("auth_service"))
 	authController := authhandler.New(authService, logger.Named("auth_controller"))
 
-	postRepository := post_repo.NewMem(logger.Named("post_repository"))
+	commentRepository := comment_repo.NewRepo(db)
+	commentService := comments.New(commentRepository, userService)
+
+	postRepository := post_repo.NewPG(db, logger.Named("post_repository"))
 	postService := post.New(postRepository, userService, logger.Named("post_service"))
-	postController := post_app.New(postService, logger.Named("post_controller"))
+	postController := post_app.New(postService, commentService, logger.Named("post_controller"))
 	return &app.DIContainer{
 		AuthController: *authController,
 		PostController: *postController,

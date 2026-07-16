@@ -13,7 +13,7 @@ func Connect(cfg config.DB) (*sqlx.DB, error) {
 	dbURL := fmt.Sprintf("postgres://%s:%s@%s:%d/%s",
 		cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.DBName)
 
-	db, err := sqlx.Open("pgx", dbURL)
+	db, err := sqlx.Connect("pgx", dbURL)
 	if err != nil {
 		return nil, fmt.Errorf("error connect to database: %w", err)
 	}
