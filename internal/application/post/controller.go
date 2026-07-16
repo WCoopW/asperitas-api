@@ -5,7 +5,10 @@ import (
 	"errors"
 	"net/http"
 
-	domain "reddit/internal/domain/post"
+	"reddit/internal/apperrors"
+	d_comment "reddit/internal/domain/comments"
+	d_post "reddit/internal/domain/post"
+
 	"reddit/pkg/helpers"
 
 	"github.com/gorilla/mux"
@@ -13,18 +16,23 @@ import (
 )
 
 type PostController struct {
-	postService domain.PostService
-	logger      *zap.SugaredLogger
+	postService    d_post.PostService
+	commentService d_comment.CommentService
+	logger         *zap.SugaredLogger
 }
 
-func New(postService domain.PostService, logger *zap.SugaredLogger) *PostController {
-	return &PostController{postService: postService, logger: logger}
+func New(postService d_post.PostService, commentService d_comment.CommentService, logger *zap.SugaredLogger) *PostController {
+	return &PostController{
+		postService:    postService,
+		commentService: commentService,
+		logger:         logger,
+	}
 }
 
 func (c *PostController) GetPosts(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := helpers.CtxDefaultTimeout(r.Context(), nil)
 	defer cancel()
-	posts, err := c.postService.GetPosts(ctx, domain.PostFilter{}, 0, 0)
+	posts, err := c.postService.GetPosts(ctx, d_post.PostFilter{}, 0, 0)
 	if err != nil {
 		writeAppError(w, err)
 		return
@@ -97,8 +105,8 @@ func (c *PostController) CreatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	userID := r.Context().Value("user_id").(string)
-	p := domain.Post{
-		Type:     domain.PostType(dto.Type),
+	p := d_post.Post{
+		Type:     d_post.PostType(dto.Type),
 		Title:    dto.Title,
 		Text:     dto.Text,
 		URL:      dto.URL,
@@ -117,7 +125,7 @@ func (c *PostController) DeletePost(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := helpers.CtxDefaultTimeout(r.Context(), nil)
 	defer cancel()
 	if postID == "" {
-		writeAppError(w, domain.ErrInvalidData)
+		writeAppError(w, apperrors.ErrInvalidData)
 		return
 	}
 	userID := r.Context().Value("user_id").(string)
@@ -134,7 +142,7 @@ func (c *PostController) AddComment(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := helpers.CtxDefaultTimeout(r.Context(), nil)
 	defer cancel()
 	if postID == "" {
-		writeAppError(w, domain.ErrInvalidData)
+		writeAppError(w, apperrors.ErrInvalidData)
 		return
 	}
 	var dto CreateCommentDTO
@@ -144,14 +152,11 @@ func (c *PostController) AddComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if dto.Body == "" {
-		writeAppError(w, domain.ErrInvalidData)
+		writeAppError(w, apperrors.ErrInvalidData)
 		return
 	}
 	userID := r.Context().Value("user_id").(string)
-	comment := domain.Comment{
-		Body: dto.Body,
-	}
-	result, err := c.postService.AddComment(ctx, postID, userID, comment)
+	result, err := c.commentService.Create(ctx, postID, userID, userID)
 	if err != nil {
 		writeAppError(w, err)
 		return
@@ -167,11 +172,11 @@ func (c *PostController) DeleteComment(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(string)
 
 	if postID == "" || userID == "" || commentID == "" {
-		writeAppError(w, domain.ErrInvalidData)
+		writeAppError(w, apperrors.ErrInvalidData)
 		return
 	}
 
-	err := c.postService.DeleteComment(ctx, postID, commentID, userID)
+	err := c.commentService.Delete(ctx, commentID, userID)
 	if err != nil {
 		writeAppError(w, err)
 		return
@@ -184,7 +189,7 @@ func (c *PostController) UpvotePost(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := helpers.CtxDefaultTimeout(r.Context(), nil)
 	defer cancel()
 	if postID == "" {
-		writeAppError(w, domain.ErrInvalidData)
+		writeAppError(w, apperrors.ErrInvalidData)
 		return
 	}
 	userID := r.Context().Value("user_id").(string)
@@ -201,7 +206,7 @@ func (c *PostController) DownvotePost(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := helpers.CtxDefaultTimeout(r.Context(), nil)
 	defer cancel()
 	if postID == "" {
-		writeAppError(w, domain.ErrInvalidData)
+		writeAppError(w, apperrors.ErrInvalidData)
 		return
 	}
 	userID := r.Context().Value("user_id").(string)
@@ -218,7 +223,7 @@ func (c *PostController) UnvotePost(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := helpers.CtxDefaultTimeout(r.Context(), nil)
 	defer cancel()
 	if postID == "" {
-		writeAppError(w, domain.ErrInvalidData)
+		writeAppError(w, apperrors.ErrInvalidData)
 		return
 	}
 	userID := r.Context().Value("user_id").(string)
@@ -231,13 +236,13 @@ func (c *PostController) UnvotePost(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeAppError(w http.ResponseWriter, err error) {
-	var vErr *domain.ValidationError
+	var vErr *apperrors.ValidationError
 	switch {
-	case errors.Is(err, domain.ErrNotFound):
+	case errors.Is(err, apperrors.ErrNotFound):
 		helpers.WriteError(w, http.StatusNotFound, "post not found")
-	case errors.Is(err, domain.ErrForbidden):
+	case errors.Is(err, apperrors.ErrForbidden):
 		helpers.WriteError(w, http.StatusForbidden, "forbidden")
-	case errors.Is(err, domain.ErrInvalidData):
+	case errors.Is(err, apperrors.ErrInvalidData):
 		helpers.WriteError(w, http.StatusBadRequest, "invalid data")
 	case errors.As(err, &vErr):
 		helpers.WriteJSON(w, http.StatusUnprocessableEntity, map[string]string{

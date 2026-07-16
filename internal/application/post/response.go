@@ -3,6 +3,7 @@ package post
 import (
 	"time"
 
+	comment "reddit/internal/domain/comments"
 	domain "reddit/internal/domain/post"
 	"reddit/internal/domain/user"
 )
@@ -31,7 +32,7 @@ type CommentResponseDTO struct {
 	Body      string            `json:"body"`
 }
 
-func newCommentResponseDTO(comment domain.Comment) CommentResponseDTO {
+func newCommentResponseDTO(comment comment.Comment) CommentResponseDTO {
 	return CommentResponseDTO{
 		ID:        comment.ID,
 		CreatedAt: comment.CreatedAt,
