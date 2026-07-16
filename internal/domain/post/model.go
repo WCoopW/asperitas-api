@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"reddit/internal/domain/comments"
 	"reddit/internal/domain/user"
 )
 
@@ -26,20 +27,21 @@ type Post struct {
 	Votes            []Vote
 	UpvotePercentage int
 	Category         string
-	Comments         []Comment
+	Comments         []comments.Comment
 	CreatedAt        time.Time
 }
+
+type PostPopulatedFields string
+
+const (
+	AuthorPopulate   PostPopulatedFields = "author"
+	VotesPopulate    PostPopulatedFields = "vote"
+	CommentsPopulate PostPopulatedFields = "comment"
+)
 
 type Vote struct {
 	UserID string
 	Vote   int
-}
-
-type Comment struct {
-	ID        string
-	CreatedAt time.Time
-	Author    user.User
-	Body      string
 }
 
 type PostFilter struct {
@@ -51,16 +53,14 @@ type PostFilter struct {
 type PostRepository interface {
 	Create(ctx context.Context, post *Post) (Post, error)
 	GetByID(ctx context.Context, id string) (Post, error)
-	Update(ctx context.Context, post *Post) (Post, error)
+	Update(ctx context.Context, post *Post) error
 	Delete(ctx context.Context, id string) error
-	DeleteComment(ctx context.Context, postID string, commentID string) error
-	AddComment(ctx context.Context, postID string, comment Comment) (Comment, error)
-	List(ctx context.Context, filter PostFilter, limit int, offset int) ([]Post, error)
-	UpdateVote(ctx context.Context, id string, userID string, value int) (Post, error)
+	List(ctx context.Context, request *PostRequest) ([]Post, error)
 }
 
 type PostRequest struct {
-	Filter PostFilter
-	Limit  int
-	Offset int
+	PostFilter
+	Limit     *int
+	Offset    *int
+	Populated []PostPopulatedFields
 }

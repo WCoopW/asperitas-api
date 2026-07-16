@@ -2,65 +2,91 @@ package post
 
 import (
 	"context"
-	"database/sql"
+	"fmt"
 
 	domain "reddit/internal/domain/post"
+	"reddit/internal/infrastructure"
 
+	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
 )
 
 type PGRepository struct {
-	db           *sql.DB
-	queryBuilder *queryBuilder
+	db           *sqlx.DB
+	mapper       *PostMapper
+	queryBuilder *PostQueryBuilder
 }
 
-func NewPG(db *sql.DB, logger *zap.SugaredLogger) domain.PostRepository {
+func NewPG(db *sqlx.DB, logger *zap.SugaredLogger) domain.PostRepository {
 	_ = logger
 	return &PGRepository{
 		db:           db,
-		queryBuilder: newQueryBuilder(),
+		mapper:       &PostMapper{},
+		queryBuilder: &PostQueryBuilder{},
 	}
 }
 
 func (r *PGRepository) GetByID(ctx context.Context, id string) (domain.Post, error) {
-	query, args := r.queryBuilder.build(domain.PostFilter{ID: id}, 0, 0)
-	row := r.db.QueryRowContext(context.Background(), query, args...)
+	query := "SELECT * FROM posts WHERE id = $1"
 	var post domain.Post
-	err := row.Scan(
-		&post.ID, &post.Title, &post.Text, &post.URL, &post.Category,
-		&post.CreatedAt, &post.Score, &post.Views, &post.UpvotePercentage,
-		&post.Votes, &post.Comments,
-	)
+	err := r.db.Select(&post, query, id)
 	if err != nil {
-		return domain.Post{}, domain.ErrNotFound
+		return domain.Post{}, infrastructure.ErrNotFound
 	}
 	return post, nil
 }
 
 func (r *PGRepository) Create(ctx context.Context, post *domain.Post) (domain.Post, error) {
-	return domain.Post{}, nil
+	schema := r.mapper.EntityToSchema(*post)
+	err := r.db.QueryRowContext(
+		ctx,
+		`INSERT INTO posts (author_id, content_type, title, text_content, url_content, category)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, created_at`,
+		schema.AuthorID,
+		schema.Type,
+		schema.Title,
+		schema.Text,
+		schema.URL,
+		schema.Category,
+	).Scan(&schema.ID, &schema.CreatedAt)
+	if err != nil {
+		return domain.Post{}, err
+	}
+	post.ID = schema.ID
+	post.CreatedAt = schema.CreatedAt
+	return *post, nil
 }
 
-func (r *PGRepository) Update(ctx context.Context, post *domain.Post) (domain.Post, error) {
-	return domain.Post{}, nil
+func (r *PGRepository) Update(ctx context.Context, post *domain.Post) error {
+	schema := r.mapper.EntityToSchema(*post)
+	query := `UPDATE posts SET 
+	author_id: author_id, type = :type, title = :title, url = :url,
+	text = :text, category = :category,	score = :score,	
+	views = :views,	upvote_percentage = :upvote_percentage,
+	created_at = :created_at, updated_at = :updated_at
+	WHERE id = :id`
+	_, err := r.db.NamedExecContext(ctx, query, schema)
+	return err
 }
 
 func (r *PGRepository) Delete(ctx context.Context, id string) error {
-	return nil
+	query := `DELETE FROM posts WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, id)
+	return err
 }
 
-func (r *PGRepository) DeleteComment(ctx context.Context, postID string, commentID string) error {
-	return nil
-}
+func (r *PGRepository) List(ctx context.Context, request *domain.PostRequest) ([]domain.Post, error) {
+	query, args := r.queryBuilder.BuildQuery(request)
+	var posts []PostWithAuthorSchema
+	err := r.db.Select(&posts, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("fetch posts failed: %w", err)
+	}
+	results := make([]domain.Post, 0, len(posts))
+	for _, v := range posts {
+		results = append(results, r.mapper.SchemaWithAuthorToEntity(v))
+	}
 
-func (r *PGRepository) AddComment(ctx context.Context, postID string, comment domain.Comment) (domain.Comment, error) {
-	return domain.Comment{}, nil
-}
-
-func (r *PGRepository) List(ctx context.Context, filter domain.PostFilter, limit int, offset int) ([]domain.Post, error) {
-	return []domain.Post{}, nil
-}
-
-func (r *PGRepository) UpdateVote(ctx context.Context, id string, userID string, value int) (domain.Post, error) {
-	return domain.Post{}, nil
+	return results, nil
 }

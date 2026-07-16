@@ -1,4 +1,4 @@
-package post
+package apperrors
 
 import (
 	"errors"
